@@ -4,7 +4,7 @@ def read_bitmap filePath
     image = Bitmap.new
 
     #Load penguin.bmp bitmap
-    image.load(File.join(filePath, 'penguin.bmp'))
+    image.load(filePath)
 
     #Modify loaded image (makes half of the image black)
     for y in 0..image.height()-1 do
@@ -14,5 +14,6 @@ def read_bitmap filePath
     end
 
     # Save
-    image.save(File.join(filePath, "modified-penguin.bmp"))
+    new_file_name = "modified-" + File.basename(filePath)
+    image.save(File.join(File.dirname(filePath), new_file_name))
 end

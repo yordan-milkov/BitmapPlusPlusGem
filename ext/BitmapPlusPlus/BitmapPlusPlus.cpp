@@ -12,9 +12,22 @@ static VALUE pixel_allocate(VALUE self) {
 }
 
 // Ruby method to create a new Pixel object
-static VALUE pixel_new(VALUE self, VALUE r, VALUE g, VALUE b) {
-    Pixel* pixel = new Pixel(NUM2UINT(r), NUM2UINT(g), NUM2UINT(b));
-    return Data_Wrap_Struct(self, NULL, free, pixel);
+static VALUE pixel_new(int argc, VALUE* argv, VALUE self) {
+    Pixel *pixel;
+    Data_Get_Struct(self, Pixel, pixel);
+    if (argc == 0) {
+        // Empty constructor, we have it
+    } else if (argc == 1 && FIXNUM_P(argv[0])) {
+        // Constructor with rgb int
+        *pixel = Pixel(NUM2INT(argv[0]));
+    } else if (argc == 3 && FIXNUM_P(argv[0]) && FIXNUM_P(argv[1]) && FIXNUM_P(argv[2])) {
+        // Constructor with rgb values
+        *pixel = Pixel(NUM2UINT(argv[0]),NUM2UINT(argv[1]),NUM2UINT(argv[2]));
+    } else {
+        rb_raise(rb_eArgError, "Invalid number or types of arguments");
+    }
+    
+    return self;
 }
 
 // Ruby method to get the red value of a Pixel object
@@ -68,6 +81,13 @@ static VALUE pixel_set_b(VALUE self, VALUE value) {
     return value;
 }
 
+static VALUE pixel_equal(VALUE self, VALUE other) {
+    Pixel *pixel1, *pixel2;
+    Data_Get_Struct(self, Pixel, pixel1);
+    Data_Get_Struct(other, Pixel, pixel2);
+
+    return *pixel1 == *pixel2 ? Qtrue : Qfalse;
+}
 
 // Define the BitmapWrapper struct for Ruby class
 typedef struct {
@@ -101,6 +121,10 @@ static VALUE bitmap_initialize(int argc, VALUE* argv, VALUE self) {
         VALUE rb_file_path = argv[0];
         std::string file(RSTRING_PTR(rb_file_path), RSTRING_LEN(rb_file_path));
         bitmap_wrapper->bitmap = new Bitmap(file);
+    } else if (argc == 1 && rb_type(argv[0]) == T_DATA) {
+        BitmapWrapper* source_wrapper;
+        Data_Get_Struct(argv[0], BitmapWrapper, source_wrapper);
+        bitmap_wrapper->bitmap = new Bitmap(*source_wrapper->bitmap);
     } else if (argc == 2 && FIXNUM_P(argv[0]) && FIXNUM_P(argv[1])) {
         // Constructor with dimensions
         int width = NUM2INT(argv[0]);
@@ -126,6 +150,15 @@ static VALUE bitmap_height(VALUE self) {
 }
 
 // Ruby method to modify a pixel in a bitmap
+static VALUE bitmap_get_pixel(VALUE self, VALUE x, VALUE y) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+
+    Pixel* pixel = &bitmap_wrapper->bitmap->get(NUM2INT(x), NUM2INT(y));
+    return Data_Wrap_Struct(cPixel, NULL, NULL, &pixel);
+}
+
+// Ruby method to modify a pixel in a bitmap
 static VALUE bitmap_set_pixel(VALUE self, VALUE x, VALUE y, VALUE pixel_obj) {
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
@@ -148,6 +181,28 @@ static VALUE bitmap_load(VALUE self, VALUE filename) {
     return Qnil;
 }
 
+// Ruby method to clear the bitmap
+static VALUE bitmap_clear(int argc, VALUE* argv, VALUE self) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+
+    // Parse the pixel argument
+    VALUE rb_pixel;
+    if (argc == 0) {
+      bitmap_wrapper->bitmap->clear();
+    } else if (argc == 1) {
+        // Unwrap the Ruby pixel object
+        Pixel* pixel;
+        Data_Get_Struct(argv[0], Pixel, pixel);
+
+        // Call the clear method
+        bitmap_wrapper->bitmap->clear(*pixel);
+    } else {
+        rb_raise(rb_eArgError, "Invalid number of arguments");
+    }
+    return Qnil;
+}
+
 // Ruby method to save the bitmap
 static VALUE bitmap_save(VALUE self, VALUE filename) {
     BitmapWrapper* bitmap_wrapper;
@@ -159,6 +214,25 @@ static VALUE bitmap_save(VALUE self, VALUE filename) {
     bitmap_wrapper->bitmap->save(file);
 
     return Qnil;
+}
+
+// Ruby method for operator [] of the bitmap
+static VALUE bitmap_subscript(VALUE self, VALUE rb_i) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+
+    int index = NUM2INT(rb_i);
+    VALUE rb_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, &bitmap_wrapper->bitmap[index]);
+
+    return rb_pixel;
+}
+
+static VALUE bitmap_equal(VALUE self, VALUE other) {
+    BitmapWrapper *bitmap1, *bitmap2;
+    Data_Get_Struct(self, BitmapWrapper, bitmap1);
+    Data_Get_Struct(other, BitmapWrapper, bitmap2);
+
+    return *bitmap1->bitmap == *bitmap2->bitmap ? Qtrue : Qfalse;
 }
 
 // Ruby method to iterate over the pixels of a bitmap
@@ -178,13 +252,14 @@ extern "C" void Init_BitmapPlusPlus() {
     // Define the Pixel class
     cPixel = rb_define_class("Pixel", rb_cObject);
     rb_define_alloc_func(cPixel, pixel_allocate);
-    rb_define_method(cPixel, "initialize", pixel_new, 3);
+    rb_define_method(cPixel, "initialize", pixel_new, -1);
     rb_define_method(cPixel, "r", pixel_get_r, 0);
     rb_define_method(cPixel, "g", pixel_get_g, 0);
     rb_define_method(cPixel, "b", pixel_get_b, 0);
     rb_define_method(cPixel, "r=", pixel_set_r, 1);
     rb_define_method(cPixel, "g=", pixel_set_g, 1);
     rb_define_method(cPixel, "b=", pixel_set_b, 1);
+    rb_define_method(cPixel, "==", pixel_equal, 1);
 
     VALUE rb_white_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&White));
     rb_define_const(cPixel, "WHITE", rb_white_pixel);
@@ -203,9 +278,13 @@ extern "C" void Init_BitmapPlusPlus() {
     rb_define_method(cBitmap, "initialize", bitmap_initialize, -1);
     rb_define_method(cBitmap, "width", bitmap_width, 0);
     rb_define_method(cBitmap, "height", bitmap_height, 0);
+    rb_define_method(cBitmap, "get", bitmap_get_pixel, 2);
     rb_define_method(cBitmap, "set", bitmap_set_pixel, 3);
     rb_define_method(cBitmap, "load", bitmap_load, 1);
+    rb_define_method(cBitmap, "clear", bitmap_clear, -1);
     rb_define_method(cBitmap, "save", bitmap_save, 1);
+    rb_define_method(cBitmap, "[]", bitmap_subscript, 1);
+    rb_define_method(cBitmap, "==", bitmap_equal, 1);
 
     // Include the Enumerable module in the Bitmap class
     rb_include_module(cBitmap, rb_const_get(rb_cObject, rb_intern("Enumerable")));
