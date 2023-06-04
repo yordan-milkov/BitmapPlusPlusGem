@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name          = "BitmapPlusPlus"
-  spec.version       = "0.9.0"
+  spec.version       = "1.0.0"
   spec.authors       = ["Yordan Kostadinov"]
   spec.email         = 'yordan.milkov.kostadinov@gmail.com'
   spec.summary       = "BitmapPlusPlus library binding gem"
