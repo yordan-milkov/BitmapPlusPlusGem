@@ -11,5 +11,5 @@ def randomBM fileName, width, height
     }
 
     # Save bitmap to new file image.bmp
-    image.save(fileName);
+    image.save(fileName)
 end

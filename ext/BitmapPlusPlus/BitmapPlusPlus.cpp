@@ -108,6 +108,30 @@ static VALUE bitmap_initialize_load(VALUE self, VALUE filename) {
     return Qnil;
 }
 
+static VALUE bitmap_width(VALUE self) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+    return INT2NUM(bitmap_wrapper->bitmap->width());
+}
+
+static VALUE bitmap_height(VALUE self) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+    return INT2NUM(bitmap_wrapper->bitmap->height());
+}
+
+// Ruby method to modify a pixel in a bitmap
+static VALUE bitmap_set_pixel(VALUE self, VALUE x, VALUE y, VALUE pixel_obj) {
+    BitmapWrapper* bitmap_wrapper;
+    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
+
+    Pixel* pixel;
+    Data_Get_Struct(pixel_obj, Pixel, pixel);
+
+    bitmap_wrapper->bitmap->set( NUM2INT(x), NUM2INT(y), *pixel );
+    return Qnil;
+}
+
 static VALUE bitmap_load(VALUE self, VALUE filename) {
     Check_Type(filename, T_STRING);
     std::string file(RSTRING_PTR(filename), RSTRING_LEN(filename));
@@ -129,18 +153,6 @@ static VALUE bitmap_save(VALUE self, VALUE filename) {
     
     bitmap_wrapper->bitmap->save(file);
 
-    return Qnil;
-}
-
-// Ruby method to modify a pixel in a bitmap
-static VALUE bitmap_modify_pixel(VALUE self, VALUE x, VALUE y, VALUE pixel_obj) {
-    BitmapWrapper* bitmap_wrapper;
-    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
-
-    Pixel* pixel;
-    Data_Get_Struct(pixel_obj, Pixel, pixel);
-
-    bitmap_wrapper->bitmap->set( NUM2INT(x), NUM2INT(y), *pixel );
     return Qnil;
 }
 
@@ -169,14 +181,27 @@ extern "C" void Init_BitmapPlusPlus() {
     rb_define_method(cPixel, "g=", pixel_set_g, 1);
     rb_define_method(cPixel, "b=", pixel_set_b, 1);
 
+    VALUE rb_white_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&White));
+    rb_define_const(cPixel, "WHITE", rb_white_pixel);
+    VALUE rb_black_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&Black));
+    rb_define_const(cPixel, "BLACK", rb_black_pixel);
+    VALUE rb_red_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&Red));
+    rb_define_const(cPixel, "RED", rb_red_pixel);
+    VALUE rb_blue_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&Blue));
+    rb_define_const(cPixel, "BLUE", rb_blue_pixel);
+    VALUE rb_green_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, const_cast<Pixel*>(&Green));
+    rb_define_const(cPixel, "GREEN", rb_green_pixel);
+
     // Define the Bitmap class
     VALUE cBitmap = rb_define_class("Bitmap", rb_cObject);
     rb_define_alloc_func(cBitmap, bitmap_wrapper_allocate);
     rb_define_method(cBitmap, "initialize", bitmap_initialize_size, 2);
     rb_define_method(cBitmap, "initialize_file", bitmap_initialize_load, 1);
+    rb_define_method(cBitmap, "width", bitmap_width, 0);
+    rb_define_method(cBitmap, "height", bitmap_height, 0);
+    rb_define_method(cBitmap, "set", bitmap_set_pixel, 3);
     rb_define_method(cBitmap, "load", bitmap_load, 1);
     rb_define_method(cBitmap, "save", bitmap_save, 1);
-    rb_define_method(cBitmap, "modify_pixel", bitmap_modify_pixel, 3);
 
     // Include the Enumerable module in the Bitmap class
     rb_include_module(cBitmap, rb_const_get(rb_cObject, rb_intern("Enumerable")));
