@@ -83,29 +83,34 @@ static void bitmap_wrapper_deallocate(BitmapWrapper* bitmap_wrapper) {
 // Ruby allocation method for the BitmapWrapper struct
 static VALUE bitmap_wrapper_allocate(VALUE self) {
     BitmapWrapper* bitmap_wrapper = ALLOC(BitmapWrapper);
-
+    bitmap_wrapper->bitmap = NULL;
     return Data_Wrap_Struct(self, NULL, bitmap_wrapper_deallocate, bitmap_wrapper);
 }
 
-// Ruby method to create a new Bitmap object
-static VALUE bitmap_initialize_size(VALUE self, VALUE width, VALUE height) {
+// Ruby initialize method for the BitmapWrapper class
+static VALUE bitmap_initialize(int argc, VALUE* argv, VALUE self) {
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
 
-    bitmap_wrapper->bitmap = new Bitmap(NUM2UINT(width), NUM2UINT(height));
-    return Qnil;
-}
+    if (argc == 0) {
+        // Empty constructor
+        bitmap_wrapper->bitmap = new Bitmap();
+    } else if (argc == 1 && rb_type(argv[0]) == T_STRING) {
+        // Constructor with file path
+        Check_Type(argv[0], T_STRING);
+        VALUE rb_file_path = argv[0];
+        std::string file(RSTRING_PTR(rb_file_path), RSTRING_LEN(rb_file_path));
+        bitmap_wrapper->bitmap = new Bitmap(file);
+    } else if (argc == 2 && FIXNUM_P(argv[0]) && FIXNUM_P(argv[1])) {
+        // Constructor with dimensions
+        int width = NUM2INT(argv[0]);
+        int height = NUM2INT(argv[1]);
+        bitmap_wrapper->bitmap = new Bitmap(width, height);
+    } else {
+        rb_raise(rb_eArgError, "Invalid number or types of arguments");
+    }
 
-// Ruby method to load a bitmap file and create a Bitmap object
-static VALUE bitmap_initialize_load(VALUE self, VALUE filename) {
-    Check_Type(filename, T_STRING);
-    std::string file(RSTRING_PTR(filename), RSTRING_LEN(filename));
-
-    BitmapWrapper* bitmap_wrapper;
-    Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
-    bitmap_wrapper->bitmap = new Bitmap(file);
-
-    return Qnil;
+    return self;
 }
 
 static VALUE bitmap_width(VALUE self) {
@@ -195,8 +200,7 @@ extern "C" void Init_BitmapPlusPlus() {
     // Define the Bitmap class
     VALUE cBitmap = rb_define_class("Bitmap", rb_cObject);
     rb_define_alloc_func(cBitmap, bitmap_wrapper_allocate);
-    rb_define_method(cBitmap, "initialize", bitmap_initialize_size, 2);
-    rb_define_method(cBitmap, "initialize_file", bitmap_initialize_load, 1);
+    rb_define_method(cBitmap, "initialize", bitmap_initialize, -1);
     rb_define_method(cBitmap, "width", bitmap_width, 0);
     rb_define_method(cBitmap, "height", bitmap_height, 0);
     rb_define_method(cBitmap, "set", bitmap_set_pixel, 3);

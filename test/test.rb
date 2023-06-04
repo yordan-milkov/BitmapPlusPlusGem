@@ -2,6 +2,7 @@ require "minitest/autorun"
 require "BitmapPlusPlus"
 require_relative "../examples/random.rb"
 require_relative "../examples/chess_board.rb"
+require_relative "../examples/read_bitmap.rb"
 
 class BitmapPlusPlusTest < Minitest::Test
     def get_results_path
@@ -17,5 +18,8 @@ class BitmapPlusPlusTest < Minitest::Test
     end
     def test_chess_board
         cehss_boardBM File.join(get_results_path, 'chess_board.bmp'), 640, 640
+    end
+    def test_read_bitmap
+        read_bitmap get_results_path
     end
 end

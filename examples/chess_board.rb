@@ -11,7 +11,6 @@ def cehss_boardBM fileName, width, height
     is_white = true
     (0..image.width-1).step(rect_w).each { |x|
         (0..image.height-1).step(rect_h).each { |y|
-            puts x, y
             color = is_white ? Pixel::WHITE : Pixel::BLACK
             # Fill rect
             for dx in x..x + rect_w-1
