@@ -34,9 +34,18 @@ class BitmapPlusPlusTest < Minitest::Test
 
         image1 = Bitmap.new( image2 )
         assert_equal true, (image1 == image2)
-        
-        color = image1[1]
-        image2.clear(color)
+
+        for index in 0..(image1.width*image2.height)
+            assert_equal true, (image1[index] == image2[index])
+        end
+
+        color1 = image1[0]
+        color2 = image2.get 0, 0
+        assert_equal true, (color1 == color2)
+            
+        color2.r = 1
+        color2.g = 1
+        color2.b = 1
         assert_equal false, (image1 == image2)
     end
 end

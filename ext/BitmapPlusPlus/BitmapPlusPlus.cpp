@@ -112,28 +112,34 @@ static VALUE bitmap_initialize(int argc, VALUE* argv, VALUE self) {
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
 
-    if (argc == 0) {
-        // Empty constructor
-        bitmap_wrapper->bitmap = new Bitmap();
-    } else if (argc == 1 && rb_type(argv[0]) == T_STRING) {
-        // Constructor with file path
-        Check_Type(argv[0], T_STRING);
-        VALUE rb_file_path = argv[0];
-        std::string file(RSTRING_PTR(rb_file_path), RSTRING_LEN(rb_file_path));
-        bitmap_wrapper->bitmap = new Bitmap(file);
-    } else if (argc == 1 && rb_type(argv[0]) == T_DATA) {
-        BitmapWrapper* source_wrapper;
-        Data_Get_Struct(argv[0], BitmapWrapper, source_wrapper);
-        bitmap_wrapper->bitmap = new Bitmap(*source_wrapper->bitmap);
-    } else if (argc == 2 && FIXNUM_P(argv[0]) && FIXNUM_P(argv[1])) {
-        // Constructor with dimensions
-        int width = NUM2INT(argv[0]);
-        int height = NUM2INT(argv[1]);
-        bitmap_wrapper->bitmap = new Bitmap(width, height);
-    } else {
-        rb_raise(rb_eArgError, "Invalid number or types of arguments");
+    try
+    {
+        if (argc == 0) {
+            // Empty constructor
+            bitmap_wrapper->bitmap = new Bitmap();
+        } else if (argc == 1 && rb_type(argv[0]) == T_STRING) {
+            // Constructor with file path
+            Check_Type(argv[0], T_STRING);
+            VALUE rb_file_path = argv[0];
+            std::string file(RSTRING_PTR(rb_file_path), RSTRING_LEN(rb_file_path));
+            bitmap_wrapper->bitmap = new Bitmap(file);
+        } else if (argc == 1 && rb_type(argv[0]) == T_DATA) {
+            BitmapWrapper* source_wrapper;
+            Data_Get_Struct(argv[0], BitmapWrapper, source_wrapper);
+            bitmap_wrapper->bitmap = new Bitmap(*source_wrapper->bitmap);
+        } else if (argc == 2 && FIXNUM_P(argv[0]) && FIXNUM_P(argv[1])) {
+            // Constructor with dimensions
+            int width = NUM2INT(argv[0]);
+            int height = NUM2INT(argv[1]);
+            bitmap_wrapper->bitmap = new Bitmap(width, height);
+        } else {
+            rb_raise(rb_eArgError, "Invalid number or types of arguments");
+        }
     }
-
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
     return self;
 }
 
@@ -153,9 +159,16 @@ static VALUE bitmap_height(VALUE self) {
 static VALUE bitmap_get_pixel(VALUE self, VALUE x, VALUE y) {
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
-
-    Pixel* pixel = &bitmap_wrapper->bitmap->get(NUM2INT(x), NUM2INT(y));
-    return Data_Wrap_Struct(cPixel, NULL, NULL, &pixel);
+    Pixel* pixel = NULL;
+    try
+    {
+        pixel = &bitmap_wrapper->bitmap->get(NUM2INT(x), NUM2INT(y));
+    }
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
+    return Data_Wrap_Struct(cPixel, NULL, NULL, pixel);
 }
 
 // Ruby method to modify a pixel in a bitmap
@@ -165,8 +178,14 @@ static VALUE bitmap_set_pixel(VALUE self, VALUE x, VALUE y, VALUE pixel_obj) {
 
     Pixel* pixel;
     Data_Get_Struct(pixel_obj, Pixel, pixel);
-
-    bitmap_wrapper->bitmap->set( NUM2INT(x), NUM2INT(y), *pixel );
+    try
+    {
+        bitmap_wrapper->bitmap->set( NUM2INT(x), NUM2INT(y), *pixel );
+    }
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
     return Qnil;
 }
 
@@ -176,7 +195,14 @@ static VALUE bitmap_load(VALUE self, VALUE filename) {
 
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
-    bitmap_wrapper->bitmap->load(file);
+    try
+    {
+        bitmap_wrapper->bitmap->load(file);
+    }
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
 
     return Qnil;
 }
@@ -210,8 +236,14 @@ static VALUE bitmap_save(VALUE self, VALUE filename) {
 
     Check_Type(filename, T_STRING);
     std::string file(RSTRING_PTR(filename), RSTRING_LEN(filename));
-    
-    bitmap_wrapper->bitmap->save(file);
+    try
+    {
+        bitmap_wrapper->bitmap->save(file);
+    }
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
 
     return Qnil;
 }
@@ -221,10 +253,18 @@ static VALUE bitmap_subscript(VALUE self, VALUE rb_i) {
     BitmapWrapper* bitmap_wrapper;
     Data_Get_Struct(self, BitmapWrapper, bitmap_wrapper);
 
-    int index = NUM2INT(rb_i);
-    VALUE rb_pixel = Data_Wrap_Struct(cPixel, NULL, NULL, &bitmap_wrapper->bitmap[index]);
+    size_t index = NUM2UINT(rb_i);
+    Pixel *pixel_at = NULL;
+    try
+    {
+        pixel_at = &((*bitmap_wrapper->bitmap)[index]);
+    }
+    catch (const Exception &e)
+    {
+        rb_raise(rb_eRuntimeError, e.what());
+    }
 
-    return rb_pixel;
+    return Data_Wrap_Struct(cPixel, NULL, NULL, pixel_at );
 }
 
 static VALUE bitmap_equal(VALUE self, VALUE other) {
